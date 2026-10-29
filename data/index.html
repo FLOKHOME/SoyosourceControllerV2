@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang='de'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
+<title>ESP Herzschlag</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #0d0d1a; color: #e0e0e0; padding: 16px; max-width: 600px; margin: 0 auto; }
+h1 { color: #e94560; text-align: center; font-size: 1.6em; margin: 12px 0; animation: blink 1.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+h2 { color: #0f3460; font-size: 1em; margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #1a1a3e; text-transform: uppercase; letter-spacing: 1px; }
+.card { background: #16162a; border-radius: 10px; padding: 12px 16px; margin: 8px 0; }
+.row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1f1f3a; }
+.row:last-child { border: none; }
+.lbl { color: #888; font-size: 0.9em; }
+.val { color: #4fc3f7; font-weight: bold; font-size: 0.95em; font-family: 'Consolas', monospace; }
+.dc-active { color: #4ecca3; animation: dcPulse 1s infinite; }
+@keyframes dcPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.dc-off { color: #555; }
+.notaus-on { color: #e94560; font-weight: bold; }
+.notaus-off { color: #4ecca3; }
+.btn { display: block; width: 100%; padding: 14px; margin: 6px 0; border: none; border-radius: 8px; font-size: 1em; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; }
+.btn:active { transform: scale(0.97); }
+.btn-danger { background: #c62828; color: white; }
+.btn-success { background: #2e7d32; color: white; }
+.btn-primary { background: #0f3460; color: #e0e0e0; }
+.btn-warning { background: #e65100; color: white; }
+input[type=number] { width: 100%; padding: 12px; border: 2px solid #0f3460; border-radius: 8px; background: #0d0d1a; color: #e0e0e0; font-size: 1.1em; margin: 4px 0; }
+.footer { text-align: center; margin-top: 16px; color: #444; font-size: 0.8em; }
+.footer a { color: #0f3460; text-decoration: none; }
+.gauge { background: #1f1f3a; border-radius: 10px; padding: 16px; text-align: center; margin: 8px 0; }
+.gauge-num { font-size: 2.4em; font-weight: bold; font-family: 'Consolas', monospace; color: #4fc3f7; }
+.gauge-unit { font-size: 1em; color: #888; }
+.gauge-label { font-size: 0.8em; color: #666; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>ESP Herzschlag</h1>
+
+<div class="gauge">
+  <div class="gauge-num" id="gaugeWatt">0</div>
+  <div class="gauge-unit">Watt</div>
+  <div class="gauge-label">Aktuelle Einspeisung</div>
+</div>
+
+<div class="card">
+  <h2>SOYOSOURCE Controller</h2>
+  <div class="row"><span class="lbl">Modus:</span><span class="val" id="mode">-</span></div>
+  <div class="row"><span class="lbl">SOYO ID:</span><span class="val" id="soyoID">-</span></div>
+  <div class="row"><span class="lbl">NotAus:</span><span class="val" id="notaus">-</span></div>
+  <div class="row"><span class="lbl">Frames:</span><span class="val" id="frames">-</span></div>
+  <div class="row"><span class="lbl">Fehler:</span><span class="val" id="errors">-</span></div>
+</div>
+
+<div class="card">
+  <h2>DC Werte</h2>
+  <div class="row"><span class="lbl">DC Volt:</span><span class="val" id="dcv">-</span></div>
+  <div class="row"><span class="lbl">DC Ampere:</span><span class="val" id="dca">-</span></div>
+  <div class="row"><span class="lbl">DC Watt:</span><span class="val" id="dcw">-</span></div>
+  <div class="row"><span class="lbl">Target:</span><span class="val" id="target">-</span></div>
+  <div class="row"><span class="lbl">WattsOut:</span><span class="val" id="wout">-</span></div>
+  <div class="row"><span class="lbl">MaxPower:</span><span class="val" id="maxpw">-</span></div>
+</div>
+
+<div class="card">
+  <div class="flex-row" style="display:flex; gap:8px;">
+    <button class='btn btn-danger' onclick='fetch("/NotAus")' style="flex:1;">NOTAUS</button>
+    <button class='btn btn-success' onclick='fetch("/NotAusAus")' style="flex:1;">NOTAUS AUS</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Manuelle Leistung</h2>
+  <input type='number' id='manualPower' step='1' min='0' max='2400' placeholder='Watt (z.B. 200)'>
+  <button class='btn btn-primary' onclick='sendPower()'>Senden</button>
+</div>
+
+<div class="card">
+  <h2>Einstellungen</h2>
+  <div class="row"><span class="lbl">L1:</span><span class="val" id="l1">-</span></div>
+  <div class="row"><span class="lbl">L2:</span><span class="val" id="l2">-</span></div>
+  <div class="row"><span class="lbl">L3:</span><span class="val" id="l3">-</span></div>
+  <div style="display:flex; gap:8px; margin-top:8px;">
+    <button class='btn btn-warning' onclick='setL123()' style="flex:1;">Auto L1L2L3</button>
+    <button class='btn btn-primary' onclick='setL123Static()' style="flex:1;">Static</button>
+  </div>
+  <input type='number' id='l123Value' step='1' value='200' style='margin-top:6px;'>
+</div>
+
+<div class="card">
+  <h2>Netzwerk</h2>
+  <div class="row"><span class="lbl">WiFi RSSI:</span><span class="val" id="rssi">-</span></div>
+  <div class="row"><span class="lbl">SSID:</span><span class="val" id="ssid">-</span></div>
+  <div class="row"><span class="lbl">Grid V:</span><span class="val" id="gridV">-</span></div>
+  <div class="row"><span class="lbl">Grid Hz:</span><span class="val" id="gridHz">-</span></div>
+  <div class="row"><span class="lbl">Temperatur:</span><span class="val" id="temp">-</span></div>
+</div>
+
+<div class="footer">
+  SOYOSOURCE Controller v2.0.0 &mdash; <span id="version">-</span><br>
+  <a href="/update">OTA Update</a> &middot; <a href="/config">Config</a>
+</div>
+
+<script>
+function sendPower(){
+  var pw = document.getElementById('manualPower').value;
+  if(pw) fetch('/dataonce?value=' + pw);
+}
+function setL123(){
+  var v = document.getElementById('l123Value').value;
+  fetch('/L1L2L3Auto?Value=' + v);
+}
+function setL123Static(){
+  var v = document.getElementById('l123Value').value;
+  fetch('/L1L2L3Static?Value=' + v);
+}
+function update(){
+  fetch('/data').then(r=>r.json()).then(d=>{
+    document.getElementById('gaugeWatt').innerText = d.DCWatts || 0;
+    document.getElementById('mode').innerText = d.ControllerMode || '-';
+    document.getElementById('soyoID').innerText = d.SOYOID || '-';
+    document.getElementById('notaus').innerHTML = d.NotAus ? '<span class="notaus-on">AKTIV</span>' : '<span class="notaus-off">Aus</span>';
+    document.getElementById('frames').innerText = d.frameCount || 0;
+    document.getElementById('errors').innerText = d.errorCount || 0;
+    document.getElementById('dcv').innerHTML = '<span'+(d.dcActive?' class="dc-active"':'')+'>'+(d.DCVolts||0).toFixed(1)+' V</span>';
+    document.getElementById('dca').innerHTML = '<span'+(d.dcActive?' class="dc-active"':'')+'>'+(d.DCAmps||0).toFixed(2)+' A</span>';
+    document.getElementById('dcw').innerHTML = '<span'+(d.dcActive?' class="dc-active"':'')+'>'+(d.DCWatts||0)+' W</span>';
+    document.getElementById('target').innerText = (d.targetPower||0) + ' W';
+    document.getElementById('wout').innerText = (d.WattsOut||0) + ' W';
+    document.getElementById('maxpw').innerText = (d.MaxPower||0) + ' W';
+    document.getElementById('l1').innerText = d.L1 || '-';
+    document.getElementById('l2').innerText = d.L2 || '-';
+    document.getElementById('l3').innerText = d.L3 || '-';
+    document.getElementById('rssi').innerHTML = d.WIFI_RSSI < -80 ? '<span style="color:#e94560">'+d.WIFI_RSSI+'</span>' :
+      d.WIFI_RSSI < -60 ? '<span style="color:#e65100">'+d.WIFI_RSSI+'</span>' : '<span style="color:#4ecca3">'+d.WIFI_RSSI+'</span>';
+    document.getElementById('ssid').innerText = d.WIFI_SSID || '-';
+    document.getElementById('gridV').innerText = (d.gridV||0).toFixed(0) + ' V';
+    document.getElementById('gridHz').innerText = (d.gridHz||0).toFixed(1) + ' Hz';
+    document.getElementById('temp').innerText = (d.tempC||0).toFixed(1) + ' °C';
+    document.getElementById('version').innerText = d.Version || '-';
+  });
+}
+setInterval(update, 1500);
+update();
+</script>
+</body>
+</html>
